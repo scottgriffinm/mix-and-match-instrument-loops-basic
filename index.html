@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mute/Unmute and Loop Audio</title>
+    <style>
+        .container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            flex-wrap: wrap;
+            gap: 20px;
+            position: relative;
+        }
+        .group-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+        .button-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .marker {
+            width: 20px;
+            height: 20px;
+            display: inline-block;
+            border-radius: 50%;
+            margin-bottom: 10px;
+        }
+        .muted {
+            background-color: red;
+        }
+        .unmuted {
+            background-color: green;
+        }
+        .audio-button {
+            width: 150px;
+            height: 30px;
+            transition: transform 0.2s;
+        }
+        .enlarged {
+            transform: scale(1.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="container">
+        <!-- Groups will be dynamically added here -->
+    </div>
+
+    <script>
+        const audioFiles = [
+            'loops/176_cmaj_Saved_vocals.wav',
+            'loops/176_cmaj_Saved_keyboard.wav',
+            'loops/176_cmaj_Saved_drums.wav',
+            'loops/176_cmaj_Saved_bass.wav',
+            'loops/138_dmaj_Lost_vocals.wav', 
+            'loops/138_dmaj_Lost_keyboard.wav',
+            'loops/138_dmaj_Lost_drums.wav',
+            'loops/138_dmaj_Lost_bass.wav',
+            'loops/130_cmaj_Temporary_Tattoo_vocals.wav',
+            'loops/130_cmaj_Temporary_Tattoo_keyboard.wav',
+            'loops/130_cmaj_Temporary_Tattoo_drums.wav',
+            'loops/130_cmaj_Temporary_Tattoo_bass.wav',
+            'loops/123_cmaj_Traffic_vocals.wav',
+            'loops/123_cmaj_Traffic_keyboard.wav',
+            'loops/123_cmaj_Traffic_drums.wav',
+            'loops/123_cmaj_Traffic_bass.wav',
+            'loops/120_cmaj_Tether_vocals.wav',
+            'loops/120_cmaj_Tether_keyboard.wav',
+            'loops/120_cmaj_Tether_drums.wav',
+            'loops/120_cmaj_Tether_bass.wav',
+            // 'loops/120_cmaj_Covered_In_Light_vocals.wav',
+            // 'loops/120_cmaj_Covered_In_Light_keyboard.wav',
+            // 'loops/120_cmaj_Covered_In_Light_drums.wav',
+            // 'loops/120_cmaj_Covered_In_Light_bass.wav'
+        ];
+
+        const parseAudioFileName = (fileName) => {
+            const parts = fileName.split('_');
+            const bpm = parts[0];
+            const key = parts[1];
+            const songName = parts.slice(2, parts.length - 1).join(' ');
+            const instrument = parts[parts.length - 1].split('.')[0];
+            return { bpm, key, songName, instrument, fileName };
+        };
+
+        const audioData = audioFiles.map(parseAudioFileName);
+
+        // Extract unique instruments from audio data
+        const instruments = [...new Set(audioData.map(audio => audio.instrument))];
+        const audioGroups = instruments.map(inst => audioData.filter(audio => audio.instrument === inst));
+
+        const audioElements = audioGroups.map(group => group.map(audio => new Audio(audio.fileName)));
+
+        // Enable looping for all audio files and set initial muted state
+        audioElements.forEach(group => {
+            group.forEach(audio => {
+                audio.loop = true;
+                audio.muted = true; // Start in muted state
+            });
+        });
+
+        // Flag to check if audio has started
+        let audioStarted = false;
+        let activeAudio = Array(instruments.length).fill(null); // Track active audio for each group
+
+        // Function to toggle mute/unmute
+        function toggleMute(groupIndex, audioIndex) {
+            if (!audioStarted) {
+                // Start all audio files the first time an unmute button is clicked
+                audioElements.forEach(group => {
+                    group.forEach(audio => audio.play());
+                });
+                audioStarted = true;
+            }
+
+            const currentAudio = audioElements[groupIndex][audioIndex];
+            const currentMarker = document.getElementById(`marker-${groupIndex}`);
+            const currentButton = document.querySelector(`#group-container-${groupIndex} .button-container`).children[audioIndex];
+
+            if (activeAudio[groupIndex] === currentAudio) {
+                // If the current audio is already playing, mute it
+                currentAudio.muted = true;
+                activeAudio[groupIndex] = null;
+                currentMarker.classList.remove('unmuted');
+                currentMarker.classList.add('muted');
+                currentButton.classList.remove('enlarged');
+            } else {
+                // Mute the previously active audio in the group
+                if (activeAudio[groupIndex] !== null) {
+                    activeAudio[groupIndex].muted = true;
+                    const prevButton = document.querySelector(`#group-container-${groupIndex} .button-container .enlarged`);
+                    if (prevButton) {
+                        prevButton.classList.remove('enlarged');
+                    }
+                }
+                // Unmute the current audio
+                currentAudio.muted = false;
+                activeAudio[groupIndex] = currentAudio;
+                currentMarker.classList.remove('muted');
+                currentMarker.classList.add('unmuted');
+                currentButton.classList.add('enlarged');
+            }
+        }
+
+        // Create group containers and buttons dynamically
+        const container = document.getElementById('container');
+
+        audioGroups.forEach((group, groupIndex) => {
+            const groupContainer = document.createElement('div');
+            groupContainer.classList.add('group-container');
+            groupContainer.id = `group-container-${groupIndex}`;
+
+            const marker = document.createElement('div');
+            marker.id = `marker-${groupIndex}`;
+            marker.classList.add('marker', 'muted');
+
+            const instrumentName = document.createElement('div');
+            instrumentName.textContent = instruments[groupIndex];
+
+            groupContainer.appendChild(instrumentName);
+            groupContainer.appendChild(marker);
+
+            const buttonContainer = document.createElement('div');
+            buttonContainer.classList.add('button-container');
+
+            group.forEach((audio, audioIndex) => {
+                const button = document.createElement('button');
+                button.classList.add('audio-button');
+                button.textContent = audio.songName;
+                button.onclick = () => toggleMute(groupIndex, audioIndex);
+                buttonContainer.appendChild(button);
+            });
+
+            groupContainer.appendChild(buttonContainer);
+            container.appendChild(groupContainer);
+        });
+    </script>
+</body>
+</html>
